@@ -1,5 +1,6 @@
 from django.db import models
-from django.utils.text import slugify
+from datetime import date
+# from django.utils.text import slugify
 
 class Person(models.Model):
   SHIRT_SIZES = {
@@ -12,6 +13,11 @@ class Person(models.Model):
 
   def __str__(self):
     return self.name
+
+class OrderedPerson(Person):
+  class Meta:
+    ordering = ['shirt_size']
+    proxy = True
 
 class Musician(models.Model):
   first_name = models.CharField(max_length=50)
@@ -79,6 +85,9 @@ class Waiter(models.Model):
   def __str__(self):
     return f'{self.name} the waiter at {self.restaurant}'
   
+class Supplier(Place):
+  customers = models.ManyToManyField(Place, related_name='provider')
+  
 class Ox(models.Model):
   horn_length = models.IntegerField()
 
@@ -114,17 +123,17 @@ def save(self **kwargs):
   do_something_else()
 """
 
-class Blog(models.Model):
-  name = models.CharField(max_length=100)
-  slug = models.TextField()
+# class Blog(models.Model):
+#   name = models.CharField(max_length=100)
+#   slug = models.TextField()
 
-  def save(self, **kwargs):
-    self.slug = slugify(self.name)
-    if (
-      update_fields := kwargs.get('update_fields')
-    ) is not None and 'name' in update_fields:
-      kwargs['update_fields'] = {'slug'}.union(update_fields)
-    super().save(**kwargs)
+#   def save(self, **kwargs):
+#     self.slug = slugify(self.name)
+#     if (
+#       update_fields := kwargs.get('update_fields')
+#     ) is not None and 'name' in update_fields:
+#       kwargs['update_fields'] = {'slug'}.union(update_fields)
+#     super().save(**kwargs)
 
 class CommonInfo(models.Model):
   name = models.CharField(max_length=100)
@@ -144,3 +153,68 @@ class Student(CommonInfo, Unmanaged):
   
   class Meta(CommonInfo.Meta, Unmanaged.Meta):
     db_table = 'student_info'
+
+class NewManager(models.Manager):
+  pass
+
+class ExtraManagers(models.Model):
+  secondary = NewManager()
+  class Meta:
+    abstract = True
+
+class MyPerson(Person, ExtraManagers):
+  class Meta:
+    proxy = True
+  
+  def do_something(self):
+    pass
+
+# class Article(models.Model):
+#   article_id = models.AutoField(primary_key=True)
+
+# class Book(models.Model):
+#   book_id = models.AutoField(primary_key=True)
+
+# class BookReview(Book, Article):
+#   pass
+
+# OR:
+class Piece(models.Model):
+  pass
+
+class Article(Piece):
+  article_piece = models.OneToOneField(Piece, on_delete=models.CASCADE, parent_link=True)
+
+class Book(Piece):
+  book_piece = models.OneToOneField(Piece, on_delete=models.CASCADE, parent_link=True)
+
+class BookReview(Book, Article):
+  pass
+
+class Blog(models.Model):
+  name = models.CharField(max_length=100)
+  tagline = models.TextField()
+
+  def __str__(self):
+    return self.name
+  
+class Author(models.Model):
+  name = models.CharField(max_length=200)
+  email = models.EmailField()
+
+  def __str__(self):
+    return self.name
+  
+class Entry(models.Model):
+  blog = models.ForeignKey(Blog, on_delete=models.CASCADE)
+  headline = models.CharField(max_length=255)
+  body_text = models.TextField()
+  pub_date = models.DateField()
+  mod_date = models.DateField(default=date.today)
+  authors = models.ManyToManyField(Author)
+  number_of_comments = models.IntegerField(default=0)
+  number_of_pingbacks = models.IntegerField(default=0)
+  rating = models.IntegerField(default=5)
+
+  def __str__(self):
+    return self.headline
