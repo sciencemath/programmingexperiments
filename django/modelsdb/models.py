@@ -185,11 +185,11 @@ class Piece(models.Model):
 class Article(Piece):
   article_piece = models.OneToOneField(Piece, on_delete=models.CASCADE, parent_link=True)
 
-class Book(Piece):
-  book_piece = models.OneToOneField(Piece, on_delete=models.CASCADE, parent_link=True)
+# class Book(Piece):
+#   book_piece = models.OneToOneField(Piece, on_delete=models.CASCADE, parent_link=True)
 
-class BookReview(Book, Article):
-  pass
+# class BookReview(Book, Article):
+#   pass
 
 class Blog(models.Model):
   name = models.CharField(max_length=100)
@@ -201,9 +201,29 @@ class Blog(models.Model):
 class Author(models.Model):
   name = models.CharField(max_length=200)
   email = models.EmailField()
+  age = models.IntegerField()
 
   def __str__(self):
     return self.name
+  
+class Publisher(models.Model):
+  name = models.CharField(max_length=300)
+
+class Book(models.Model):
+  name = models.CharField(max_length=300)
+  pages = models.IntegerField()
+  price = models.DecimalField(max_digits=10, decimal_places=2)
+  rating = models.FloatField()
+  authors = models.ManyToManyField(Author)
+  publisher = models.ForeignKey(Publisher, on_delete=models.CASCADE)
+  pubdate = models.DateField()
+
+  def __str__(self):
+    return self.name
+
+class Store(models.Model):
+  name = models.CharField(max_length=300)
+  books = models.ManyToManyField(Book)
   
 class Entry(models.Model):
   blog = models.ForeignKey(Blog, on_delete=models.CASCADE)
@@ -368,4 +388,80 @@ a = Author.objects.get(id=5)
 a.entry_set.all()  # Returns all Entry objects for this Author.
 
 if things get complicated on the Django layer, can always write raw SQL.
+It’s difficult to intuit how the ORM will translate complex querysets 
+into SQL queries so when in doubt, inspect the SQL with str(queryset.query)
+and write plenty of tests.
+
+Aggregations
+from django.db.models import FloatField
+Book.objects.aggregate(
+    price_diff=Max("price", output_field=FloatField()) - Avg("price")
+)
+
+from django.db.models import Count
+pubs = Publisher.objects.annotate(num_books=Count('book'))
+pubs[0].num_books
+
+from django.db.models import Q
+above_5 = Count('book', filter=Q(book__rating__gt=5))
+below_5 = Count('book', filter=Q(book__rating__lte=5))
+pubs = Publisher.objects.annotate(below_5=below_5).annotate(above_5=above_5)
+pubs[0].above_5
+pubs[0].below_5
+
+pubs = Publisher.objects.annotate(num_books=Count('book')).order_by('-num_books')[:5]
+pubs[0].num_books
+
+aggregate returns name/value pairs
+Book.objects.aggregate(average_price=Avg("price"))
+{'average_price': 34.35} 
+
+q = Book.objects.annotate(Count("authors"))
+q[0]
+q[0].authors__count
+you can override the default by providing your own alias:
+q = Book.objects.annotate(num_authors=Count("authors"))
+q[0].num_authors
+
+annotate() clause is a QuerySet
+aggregate() clause terminal clause
+
+combining aggregations with annotate will result in joins
+sometimes leading to WRONG results distinct may help
+q = Book.objects.annotate(
+    Count("authors", distinct=True), Count("store", distinct=True)
+)
+q[0].authors__count
+q[0].store__count
+
+When specifying the field to be aggregated in an aggregate function,
+Django will allow you to use the same double underscore notation that
+is used when referring to related fields in filters.
+Store.objects.annotate(min_price=Min("books__price"), max_price=Max("books__price"))
+Store.objects.aggregate(min_price=Min("books__price"), max_price=Max("books__price"))
+
+annotate(): Adds aggregation to individual objects in the queryset (per Store in this case).
+aggregate(): Calculates a global aggregate across the entire queryset and returns a summary.
+
+reverse many-to-many hop:
+Author.objects.annotate(total_pages=Sum("book__pages"))
+If no such alias were specified: book__pages__sum
+Author.objects.aggregate(average_rating=Avg("book__rating"))
+
+using annotate with filter
+Book.objects.filter(name__startswith="Django").annotate(num_authors=Count("authors"))
+all books
+Book.objects.filter(name__startswith="Django").aggregate(Avg("price"))
+
+generate a list of authors with a count of highly rated books
+highly_rated = Count("book", filter=Q(book__rating__gte=7))
+Author.objects.annotate(num_books=Count("book"), highly_rated_books=highly_rated)
+
+when using annotate() and filter/values() order matters!
+if the values() clause precedes the annotate() clause,
+any annotations will be automatically added to the results.
+If the values() clause is applied after the annotate() clause,
+you need to explicitly include the aggregate column.
+
+usually you want order_by() last
 """
