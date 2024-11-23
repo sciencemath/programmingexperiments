@@ -218,3 +218,154 @@ class Entry(models.Model):
 
   def __str__(self):
     return self.headline
+  
+class Dog(models.Model):
+  name = models.CharField(max_length=200)
+  data = models.JSONField(null=True)
+
+  def __str__(self):
+    return self.name
+  
+class EntryDetail(models.Model):
+  entry = models.OneToOneField(Entry, on_delete=models.CASCADE)
+  details = models.TextField()
+  
+"""
+Noting here the queries I might forget
+
+F() compares fields
+Entry.objects.filter(number_of_comments__gt=F("number_of_pingbacks"))
+Entry.objects.filter(rating__lt=F("number_of_comments") + F("number_of_pingbacks"))
+
+can act like a join (__)
+Entry.objects.filter(authors__name=F('blog__name'))
+
+Entry.objects.filter(mod_date__gt=F("pub_date") + timedelta(days=3))
+
+to find all Entry objects published in the same year as they were last modified:
+Entry.objects.filter(pub_date__year=F('mod_date__year'))
+
+from django.db.models import Min
+Entry.objects.aggregate(first_published_year=Min("pub_date__year"))
+
+finds the value of the highest rated entry and the total number of comments on all entries for each year:
+
+from django.db.models import OuterRef, Subquery, Sum
+Entry.objects.values("pub_date__year").annotate(
+    top_rating=Subquery(
+        Entry.objects.filter(
+            pub_date__year=OuterRef("pub_date__year"),
+        )
+        .order_by("-rating")
+        .values("rating")[:1]
+    ),
+    total_comments=Sum("number_of_comments"),
+)
+
+Get blogs entries with id 1, 4 and 7
+Blog.objects.filter(pk__in=[1, 4, 7])
+
+reuse Querysets to utilize the cache!
+BAD:
+print([e.headline for e in Entry.objects.all()])
+print([e.pub_date for e in Entry.objects.all()])
+
+GOOD:
+queryset = Entry.objects.all()
+print([p.headline for p in queryset])
+print([p.pub_date for p in queryset])
+
+entire queryset has to be evaluated in order to leverage the cache
+example:
+BAD:
+queryset = Entry.objects.all()
+print(queryset[5])  # Queries the database
+print(queryset[5])  # Queries the database again
+
+GOOD
+queryset = Entry.objects.all()
+[entry for entry in queryset]  # Queries the database
+print(queryset[5])  # Uses cache
+print(queryset[5])  # Uses cache
+
+it is possible to store JSON scalar null instead of SQL NULL by using Value(None, JSONField()).
+Whichever of the values is stored, when retrieved from the database,
+the Python representation of the JSON scalar null is the same as SQL NULL,
+i.e. None. Therefore, it can be hard to distinguish between them.
+
+Storing JSON scalar null does not violate null=False
+
+Transactions are not currently supported with asynchronous queries and updates.
+You will find that trying to use one raises SynchronousOnlyOperation.
+
+If you wish to use a transaction, we suggest you write your ORM code inside a separate,
+synchronous function and then call that using sync_to_async 
+
+from django.db.models.fields.json import KT
+looks up JSON data:
+Dog.objects.create(
+    name="Shep",
+    data={
+        "owner": {"name": "Bob"},
+        "breed": ["collie", "lhasa apso"],
+    },
+)
+Dogs.objects.annotate(
+    first_breed=KT("data__breed__1"), owner_name=KT("data__owner__name")
+).filter(first_breed__startswith="lhasa", owner_name="Bob")
+
+Dog.objects.create(name="Rufus", data={"breed": "labrador", "owner": "Bob"})
+Dog.objects.create(name="Meg", data={"breed": "collie", "owner": "Bob"})
+Dog.objects.filter(data__contains={"owner": "Bob"})
+<QuerySet [<Dog: Rufus>, <Dog: Meg>]>
+
+A Q object (django.db.models.Q) is an object used to encapsulate a collection of keyword arguments.
+These keyword arguments are specified as in “Field lookups” above.
+Q objects can be combined using the &, |, and ^ operators. When an operator is used on two Q objects, it yields a new Q object.
+Q(question__startswith="Who") | Q(question__startswith="What")
+SQL equivalent: WHERE question LIKE 'Who%' OR question LIKE 'What%'
+
+Poll.objects.get(
+    Q(question__startswith="Who"),
+    Q(pub_date=date(2005, 5, 2)) | Q(pub_date=date(2005, 5, 6)),
+)
+SQL equivalent: 
+SELECT * from polls WHERE question LIKE 'Who%'
+    AND (pub_date = '2005-05-02' OR pub_date = '2005-05-06')
+
+must precede the definition of any keyword arguments.
+BAD:
+Poll.objects.get(
+    question__startswith="Who",
+    Q(pub_date=date(2005, 5, 2)) | Q(pub_date=date(2005, 5, 6)),
+)
+GOOD:
+Poll.objects.get(
+    Q(pub_date=date(2005, 5, 2)) | Q(pub_date=date(2005, 5, 6)),
+    question__startswith="Who",
+)
+
+it is possible to easily create new instance with all fields values copied.
+you can set pk to None and _state.adding to True.
+blog.pk = None
+blog._state.adding = True
+blog.save()
+doesn't copy relations that aren't part of the models database table
+
+update() doesn't run save() you can do it in a loop of a QuerySet:
+for item in query_set:
+  item.save()
+updating a counter with F()
+Entry.objects.update(number_of_pingbacks=F("number_of_pingbacks") + 1)
+
+MANY-TO-MANY
+e = Entry.objects.get(id=3)
+e.authors.all()  # Returns all Author objects for this Entry.
+e.authors.count()
+e.authors.filter(name__contains="John")
+
+a = Author.objects.get(id=5)
+a.entry_set.all()  # Returns all Entry objects for this Author.
+
+if things get complicated on the Django layer, can always write raw SQL.
+"""
