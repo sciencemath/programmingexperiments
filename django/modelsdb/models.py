@@ -1,23 +1,46 @@
 from django.db import models
 from datetime import date
 # from django.utils.text import slugify
+from django.db.models.functions import Coalesce
+
+class PersonQuerySet(models.QuerySet):
+  def authors(self):
+    return self.filter(role="A")
+  
+  def editors(self):
+    return self.filter(role="E")
+  
+class PersonManager(models.Manager):
+  def get_queryset(self):
+    return PersonQuerySet(self.model, using=self._db)
+  
+  def authors(self):
+    return self.get_queryset().authors()
+  
+  def editors(self):
+    return self.get_queryset().editors()
 
 class Person(models.Model):
-  SHIRT_SIZES = {
-    "S": "Small",
-    "M": "Medium",
-    "L": "Large",
-  }
-  name = models.CharField(max_length=60)
-  shirt_size = models.CharField(max_length=1, choices=SHIRT_SIZES)
+  # SHIRT_SIZES = {
+  #   "S": "Small",
+  #   "M": "Medium",
+  #   "L": "Large",
+  # }
+  # name = models.CharField(max_length=60)
+  # shirt_size = models.CharField(max_length=1, choices=SHIRT_SIZES)
+  # people = PersonQuery.as_manager()
+  first_name = models.CharField(max_length=60)
+  last_name = models.CharField(max_length=60)
+  birth_date = models.DateField()
+  people = PersonManager()
 
   def __str__(self):
     return self.name
 
-class OrderedPerson(Person):
-  class Meta:
-    ordering = ['shirt_size']
-    proxy = True
+# class OrderedPerson(Person):
+#   class Meta:
+#     ordering = ['shirt_size']
+#     proxy = True
 
 class Musician(models.Model):
   first_name = models.CharField(max_length=50)
@@ -223,7 +246,7 @@ class Book(models.Model):
 
 class Store(models.Model):
   name = models.CharField(max_length=300)
-  books = models.ManyToManyField(Book)
+  # books = models.ManyToManyField(Book)
   
 class Entry(models.Model):
   blog = models.ForeignKey(Blog, on_delete=models.CASCADE)
@@ -249,6 +272,54 @@ class Dog(models.Model):
 class EntryDetail(models.Model):
   entry = models.OneToOneField(Entry, on_delete=models.CASCADE)
   details = models.TextField()
+
+class PollManager(models.Manager):
+  def with_counts(self):
+    return self.annotate(num_responses=Coalesce(models.Count('response'), 0))
+  
+class OpinionPoll(models.Model):
+  question = models.CharField(max_length=200)
+  objects = PollManager()
+
+class Response(models.Model):
+  poll = models.ForeignKey(OpinionPoll, on_delete=models.CASCADE)
+
+class DahlBookManager(models.Manager):
+  def get_queryset(self):
+    return super().get_queryset().filter(author='Roald Dahl')
+  
+class Book(models.Model):
+  title = models.CharField(max_length=100)
+  author = models.CharField(max_length=50)
+
+  objects = models.Manager()
+  dahl_objects = DahlBookManager()
+
+class CustomQuerySet(models.QuerySet):
+  # available on both manager and queryset
+  def public_method(self):
+    return
+  # available only on QuerySet
+  def _private_method(self):
+    return
+  # available only on QuerySet
+  def opted_out_public_method(self):
+    return
+  
+  opted_out_public_method.queryset_only = True
+
+  # available on both manager and queryset
+  def _opted_in_private_method(self):
+    return
+
+  _opted_in_private_method = False
+
+class CustomManager(models.Manager):
+  def manager_only_method(self):
+    return
+
+class CustomManagerAndCustomQueryModel(models.Model):
+  objects = CustomManager.from_queryset(CustomQuerySet)()
   
 """
 Noting here the queries I might forget
