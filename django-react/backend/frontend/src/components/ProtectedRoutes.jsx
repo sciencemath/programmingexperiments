@@ -36,7 +36,11 @@ const ProtectedRoute = ({children}) => {
     const decoded = jwtDecode(token)
     const tokenExpiration = decoded.exp
     const now = Date.now() / 1000
-    (tokenExpiration < now) ? await refreshToken() : setIsAuthorized(true)
+    if (tokenExpiration < now) {
+      await refreshToken()
+      return
+    }
+    setIsAuthorized(true)
   }
 
   if (isAuthorized === null) return <div>Loading...</div>
