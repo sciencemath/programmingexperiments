@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import models
 from django.urls import reverse
 from django.utils import timezone
+from taggit.managers import TaggableManager
 # uses the database server's current date and time
 # from django.db.models.functions import Now
 
@@ -54,6 +55,8 @@ class Post(models.Model):
         self.slug
       ]
     )
+  
+  tags = TaggableManager()
 
 class Comment(models.Model):
   post = models.ForeignKey(
