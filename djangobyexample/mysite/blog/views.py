@@ -4,7 +4,12 @@ from django.views.generic import ListView
 from django.core.mail import send_mail
 from django.views.decorators.http import require_POST
 from django.db.models import Count
-from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank
+from django.contrib.postgres.search import (
+  TrigramSimilarity, # A trigram is a group of three consecutive characters.
+  # SearchVector,
+  # SearchQuery,
+  # SearchRank,
+)
 from .forms import CommentForm, EmailPostForm, SearchForm
 from .models import Post
 from taggit.models import Tag
@@ -147,16 +152,19 @@ def post_search(request):
       query = form.cleaned_data['query']
       # passing a config='spanish' allows for internationalization
       # weights are D, C, B, and A, and they refer to the numbers 0.1, 0.2, 0.4, and 1.0,
-      search_vector = SearchVector('title', weight='A') + SearchVector('body', weight='B')
-      search_query = SearchQuery(query)
+      # search_vector = SearchVector('title', weight='A') + SearchVector('body', weight='B')
+      # search_query = SearchQuery(query)
       results = (
         Post.published.annotate(
-          search=search_vector,
-          rank=SearchRank(search_vector, search_query)
+          # search=search_vector,
+          # rank=SearchRank(search_vector, search_query)
+          similarity=TrigramSimilarity('title', query)
         )
         # .filter(search=search_query)
-        .filter(rank__gte=0.3)
-        .order_by('-rank')
+        # .filter(rank__gte=0.3)
+        .filter(similarity__gt=0.1)
+        .order_by('-similarity')
+        # .order_by('-rank')
       )
 
   return render(
