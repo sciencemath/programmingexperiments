@@ -1,3 +1,7 @@
+/**
+ * A bookmarklet for collecting images on any site.
+ * functionality similar to Pintrest
+ */
 const SITE_URL = '//127.0.0.1:8000/'
 const STYLE_URL = SITE_URL + 'static/css/bookmarklet.css'
 const MIN_WIDTH = 250
@@ -30,13 +34,22 @@ const bookmarkletLaunch = () => {
     .addEventListener('click', () => bookmarklet.style.display = 'none')
 
   const images = document.querySelectorAll('img[src$=".jpg"], img[src$=".jpeg"], img[src$=".png"]')
-  console.log('images', images)
   images.forEach(image => {
     if (image.naturalWidth >= MIN_WIDTH && image.naturalHeight >= MIN_HEIGHT) {
       const imageFound = document.createElement('img')
       imageFound.src = image.src
       imagesFound.append(imageFound)
     }
+  })
+
+  imagesFound.querySelectorAll('img').forEach(image => {
+    image.addEventListener('click', (event) => {
+      bookmarklet.style.display = 'none';
+      window.open(
+        `${SITE_URL}images/create/?url=${encodeURIComponent(event.target.src)}&title=${encodeURIComponent(document.title)}`,
+        '_blank'
+      )
+    })
   })
 }
 
