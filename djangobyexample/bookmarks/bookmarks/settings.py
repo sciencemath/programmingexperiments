@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'debug_toolbar',
     'social_django',
     'django_extensions',
     'images.apps.ImagesConfig',
@@ -68,6 +69,7 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 MIDDLEWARE = [
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -156,3 +158,12 @@ ABSOLUTE_URL_OVERRIDES = {
 
 # if we need to debug the thumbnails
 # THUMBNAIL_DEBUG = True
+
+# debug toolbar
+INTERNAL_IPS = [
+  '127.0.0.1',
+]
+
+REDIS_HOST = 'localhost'
+REDIS_PORT = 6379
+REDIS_DB = 0
